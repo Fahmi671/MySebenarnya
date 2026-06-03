@@ -352,9 +352,12 @@
                 <input type="text" id="newsTitle" name="SubmissionTitle" placeholder="Enter the news title..." required
                     style="width: 100%; padding: 0.6rem; margin: 0.5rem 0 1rem; border: 1px solid #ccc; border-radius: 6px;">
 
-                <label for="newsDetails" style="font-weight: bold;">Detailed Information:</label>
+                <label for="newsDetails" style="font-weight: bold; display: flex; justify-content: space-between;">
+                    Detailed Information:
+                    <span id="char-counter" style="font-weight: normal; font-size: 0.85rem; color: #666;">0 / 255</span>
+                </label>
                 <textarea id="newsDetails" name="SubmissionDescription" rows="6" placeholder="Describe the issue or content of the news in detail..."
-                    required
+                    required maxlength="255"
                     style="width: 100%; padding: 0.6rem; margin: 0.5rem 0 1rem; border: 1px solid #ccc; border-radius: 6px; resize: vertical;"></textarea>
 
                 <label for="submission_category" style="font-weight: bold;">News Category:</label>
@@ -410,6 +413,22 @@
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            //Count Characters  
+            const newsDetails = document.getElementById('newsDetails');
+            const charCounter = document.getElementById('char-counter');
+            newsDetails.addEventListener('input', () => {
+                const currentLength = newsDetails.value.length;
+                charCounter.textContent = `${currentLength} / 255`;
+                
+                if (currentLength >= 250) {
+                    charCounter.style.color = '#E53935';
+                    charCounter.style.fontWeight = 'bold';
+                } else {
+                    charCounter.style.color = '#666';
+                    charCounter.style.fontWeight = 'normal';
+                }
+            });
+        
             const dropZone = document.getElementById('drop-zone');
             const fileInput = document.getElementById('supportingFiles');
             const fileInfo = document.getElementById('file-info');
