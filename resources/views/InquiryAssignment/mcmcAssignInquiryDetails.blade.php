@@ -287,7 +287,39 @@
         .form-field {
             margin-bottom: 1.25rem;
         }
-        select, textarea {
+        .suggestion-box {
+            background: #f4fbff;
+            border: 1px solid #b7d6f2;
+            border-radius: 12px;
+            padding: 1.1rem 1.2rem;
+            margin-bottom: 1.5rem;
+        }
+        .suggestion-title {
+            font-weight: 700;
+            color: #173c5f;
+            margin-bottom: 0.75rem;
+        }
+        .suggestion-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            margin-bottom: 0.75rem;
+        }
+        .suggestion-pill {
+            border: 1px solid #5a92c8;
+            background: #eaf4ff;
+            color: #114273;
+            padding: 0.55rem 0.95rem;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .suggestion-pill:hover {
+            background: #d5e8ff;
+            transform: translateY(-1px);
+        }
+        select, textarea, input {
             width: 100%;
             padding: 0.45rem 0.7rem;
             border-radius: 5px;
@@ -403,6 +435,20 @@
                 </div>
             @endif
 
+            @if(!empty($suggestedAgencies) && $suggestedAgencies->isNotEmpty())
+                <div class="suggestion-box">
+                    <div class="suggestion-title">Recommended agencies for this inquiry</div>
+                    <div class="suggestion-list">
+                        @foreach($suggestedAgencies as $agency)
+                            <button type="button" class="suggestion-pill" data-agency-id="{{ $agency->agencyID }}">
+                                {{ $agency->user->name ?? 'No User' }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <div>Click a recommendation to auto-select it in the assignment dropdown.</div>
+                </div>
+            @endif
+
             <form action="{{ route('InquiryAssignment.storeAssignment', ['submissionID' => $inquiry->submissionID]) }}" method="POST" class="assign-form">
                 @csrf
                 <div class="form-field">
@@ -424,5 +470,22 @@
             </form>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const agencySelect = document.getElementById('agencyID');
+
+            document.querySelectorAll('.suggestion-pill').forEach(button => {
+                button.addEventListener('click', function () {
+                    const agencyId = this.dataset.agencyId;
+                    if (!agencyId) {
+                        return;
+                    }
+
+                    agencySelect.value = agencyId;
+                    agencySelect.focus();
+                });
+            });
+        });
+    </script>
 </body>
 </html>

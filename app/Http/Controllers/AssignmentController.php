@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use App\Models\SubmissionAssignment;
 use App\Models\InquirySubmission;
 use App\Models\Agency;
@@ -68,10 +69,63 @@ class AssignmentController extends Controller
         // Get inquiry
         $inquiry = InquirySubmission::findOrFail($submissionID);
 
-        // Get all agencies for dropdown
-        $agencies = \App\Models\Agency::with('user')->get();
+        // Prefer agencies that have successfully handled this inquiry category before
+        $category = $inquiry->submissionCategory;
 
-        return view('InquiryAssignment.mcmcAssignInquiryDetails', compact('inquiry', 'agencies'));
+        $categoryMap = [
+            'crime' => 'Polis Diraja Malaysia',
+            'health' => 'Kementerian Kesihatan Malaysia',
+            'briber' => 'Suruhanjaya Pencegahan Jenayah',
+        ];
+
+        $preferredAgencyName = null;
+        $lowerCategory = strtolower($category ?? '');
+        foreach ($categoryMap as $keyword => $agencyName) {
+            if (str_contains($lowerCategory, $keyword)) {
+                $preferredAgencyName = $agencyName;
+                break;
+            }
+        }
+
+        $suggestedAgencyId = null;
+
+        if ($preferredAgencyName) {
+            $suggestedAgencyId = Agency::whereHas('user', function ($query) use ($preferredAgencyName) {
+                $query->where('name', 'like', "%{$preferredAgencyName}%");
+            })->value('agencyID');
+        }
+
+        if (!$suggestedAgencyId) {
+            $suggestedAgencyId = SubmissionAssignment::select('agencyID', DB::raw('COUNT(*) as accepted_count'))
+                ->where('jurisdictionStatus', 'Accepted')
+                ->whereHas('inquirySubmission', function ($query) use ($category) {
+                    $query->where('submissionCategory', $category);
+                })
+                ->groupBy('agencyID')
+                ->orderByDesc('accepted_count')
+                ->value('agencyID');
+        }
+
+        if (!$suggestedAgencyId) {
+            $suggestedAgencyId = SubmissionAssignment::select('agencyID', DB::raw('COUNT(*) as accepted_count'))
+                ->where('jurisdictionStatus', 'Accepted')
+                ->groupBy('agencyID')
+                ->orderByDesc('accepted_count')
+                ->value('agencyID');
+        }
+
+        if ($suggestedAgencyId) {
+            $suggestedAgencies = Agency::with('user')
+                ->where('agencyID', $suggestedAgencyId)
+                ->get();
+        } else {
+            $suggestedAgencies = collect();
+        }
+
+        // Get all agencies for dropdown
+        $agencies = Agency::with('user')->get();
+
+        return view('InquiryAssignment.mcmcAssignInquiryDetails', compact('inquiry', 'agencies', 'suggestedAgencies'));
     }
 
     public function storeAssignment(Request $request, $submissionID)
