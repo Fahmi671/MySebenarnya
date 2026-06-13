@@ -227,6 +227,85 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
         }
+
+        /* Drop zone area */
+        .drop-zone {
+            border: 2px dashed #bfa292;
+            border-radius: 12px;
+            background: #faf7ed;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem 0 1rem;
+        }
+        /* Visual feedback when file is dragged over */
+        .drop-zone.dragover {
+            border-color: #00396b;
+            background: rgba(0, 57, 107, 0.05);
+        }
+        .drop-zone p {
+            margin: 0.5rem 0 0;
+            font-size: 1rem;
+            color: #2c2c2c;
+        }
+        .drop-zone .browse-link {
+            color: #00396b;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+        .drop-zone .hint {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        /* File info bar shown after file is selected */
+        .file-info {
+            display: none;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: #ffffff;
+            border: 1px solid #bfa292;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .preview-img {
+            max-width: 60px;
+            max-height: 60px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 1px solid #ccc;
+            margin-right: 1rem;
+            display: none;
+        }
+        .icon-placeholder {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background: #e0f2fe;
+            border-radius: 6px;
+            border: 1px solid #bae6fd;
+            margin-right: 1rem;
+        }
+        .file-details {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        .file-info .remove-btn {
+            background: #E53935;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            line-height: 1;
+        }
     </style>
 </head>
 
@@ -273,9 +352,12 @@
                 <input type="text" id="newsTitle" name="SubmissionTitle" placeholder="Enter the news title..." required
                     style="width: 100%; padding: 0.6rem; margin: 0.5rem 0 1rem; border: 1px solid #ccc; border-radius: 6px;">
 
-                <label for="newsDetails" style="font-weight: bold;">Detailed Information:</label>
+                <label for="newsDetails" style="font-weight: bold; display: flex; justify-content: space-between;">
+                    Detailed Information:
+                    <span id="char-counter" style="font-weight: normal; font-size: 0.85rem; color: #666;">0 / 255</span>
+                </label>
                 <textarea id="newsDetails" name="SubmissionDescription" rows="6" placeholder="Describe the issue or content of the news in detail..."
-                    required
+                    required maxlength="255"
                     style="width: 100%; padding: 0.6rem; margin: 0.5rem 0 1rem; border: 1px solid #ccc; border-radius: 6px; resize: vertical;"></textarea>
 
                 <label for="submission_category" style="font-weight: bold;">News Category:</label>
@@ -294,9 +376,24 @@
                 </select>
 
                 <label for="supportingFiles" style="font-weight: bold;">Upload Supporting Documents or Images:</label>
+                
+                <div id="drop-zone" class="drop-zone">
+                    <p>Drag & Drop files here or <span class="browse-link">Browse files</span></p>
+                    <span class="hint">Supports: JPG, PNG, PDF, DOCX, XLSX (Max: 10MB)</span>
                 <input type="file" id="supportingFiles" name="SubmissionEvidence"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                    style="display: block; margin: 0.5rem 0 1rem;">
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="display: none;"> 
+                </div>
+
+                <!-- File info (shown after a file is selected) -->
+                <div id="file-info" class="file-info">
+                    <img id="image-preview" class="preview-img" src="#" alt="Preview" />
+                    
+                    <div class="file-details">
+                        <span id="file-name" style="font-weight: 600; font-size: 0.95rem; color: #2c2c2c;"></span>
+                        <span id="file-size" style="font-size: 0.85rem; color: #666;"></span>
+                    </div>
+                    <button type="button" id="remove-btn" class="remove-btn">&times;</button>
+                </div>
 
                 <label for="externalLinks" style="font-weight: bold;">Links (if any):</label>
                 <input type="url" id="externalLinks" name="SourceofNews" placeholder="https://example.com"
@@ -314,6 +411,93 @@
             </form>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            //Count Characters  
+            const newsDetails = document.getElementById('newsDetails');
+            const charCounter = document.getElementById('char-counter');
+            newsDetails.addEventListener('input', () => {
+                const currentLength = newsDetails.value.length;
+                charCounter.textContent = `${currentLength} / 255`;
+                
+                if (currentLength >= 250) {
+                    charCounter.style.color = '#E53935';
+                    charCounter.style.fontWeight = 'bold';
+                } else {
+                    charCounter.style.color = '#666';
+                    charCounter.style.fontWeight = 'normal';
+                }
+            });
+        
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('supportingFiles');
+            const fileInfo = document.getElementById('file-info');
+            const fileName = document.getElementById('file-name');
+            const fileSize = document.getElementById('file-size');
+            const imagePreview = document.getElementById('image-preview');
+            const iconPlaceholder = document.getElementById('icon-placeholder');
+            const removeBtn = document.getElementById('remove-btn');
+            // Click drop zone to open file chooser
+            dropZone.addEventListener('click', () => fileInput.click());
+            /// Highlight drop zone when file is dragged over
+            ['dragenter', 'dragover'].forEach(evt => {
+                dropZone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                });
+            });
+            // Remove highlight when file leaves or is dropped
+            ['dragleave', 'drop'].forEach(evt => {
+                dropZone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                });
+            });
+            // Handle dropped files 
+            dropZone.addEventListener('drop', (e) => {
+                fileInput.files = e.dataTransfer.files;
+                showFile(e.dataTransfer.files[0]);
+            });
+            // Handle file chosen via dialog
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) showFile(fileInput.files[0]);
+            });
+           // Display file name, size, and image preview 
+            function showFile(file) {
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('Error: File size exceeds 10MB limit.');
+                    clearFile();
+                    return;
+                }
+                fileName.textContent = file.name;
+            fileSize.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            fileInfo.style.display = 'flex';
+                // Show thumbnail for images, icon for documents
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        imagePreview.src = e.target.result;
+                        imagePreview.style.display = 'block';
+                        iconPlaceholder.style.display = 'none';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    imagePreview.style.display = 'none';
+                    iconPlaceholder.style.display = 'flex';
+                }
+            }
+            // Remove button clears the file
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                clearFile();
+            });
+            // Remove file upload and reset the preview
+            function clearFile() {
+                 fileInput.value = '';
+                 fileInfo.style.display = 'none';
+                 imagePreview.src = '#';
+             }
+        });
+        </script>
 </body>
-
 </html>
