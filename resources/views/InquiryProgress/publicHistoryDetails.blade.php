@@ -205,10 +205,10 @@
             transition: all 0.3s ease;
         }
         .history-table { width: 100%; border-collapse: collapse; background: #fff; }
-        .history-table th, .history-table td { padding: 0.8em 1em; text-align: left; font-size: 1.1rem; }
+        .history-table th, .history-table td { padding: 0.8em 1em; text-align: left; font-size: 1.1rem; vertical-align: middle; }
         .history-table thead tr { background: #f5f5f5; }
         .history-table tbody tr:nth-child(even) { background: #f9f9f9; }
-        .badge { padding: 0.22em 0.9em; border-radius: 14px; font-size: 1.05rem; font-weight: 600; }
+        .badge { padding: 0.22em 0.9em; border-radius: 14px; font-size: 1.05rem; font-weight: 600; display: inline-block;}
         .badge-submitted { background: #e4e4e4; color: #324; }
         .badge-accepted { background: #e3f2fd; color: #1976d2; }
         .badge-rejected { background: #f9d6d5; color: #c0392b; }
@@ -216,22 +216,22 @@
         .badge-fake { background: #ffd6d6; color: #d83333; }
         .badge-investigate { background: #fff8e1; color: #f9a825; }
         .back-btn {
-    padding: 0.5rem 1.4rem;
-    background: #00396b;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 1.05rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-    margin-top: 1.5em;
-    display: inline-block;
-    transition: background 0.2s;
-    min-width: 0;
-    width: auto;
-    align-self: flex-start; /* Add this if inside a flex-column div */
-}
+            padding: 0.5rem 1.4rem;
+            background: #00396b;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.05rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            margin-top: 1.5em;
+            display: inline-block;
+            transition: background 0.2s;
+            min-width: 0;
+            width: auto;
+            align-self: flex-start;
+        }
         .back-btn:hover {
             background: #1959a6;
         }
@@ -276,10 +276,9 @@
                         <th>Status</th>
                         <th>Date/Time</th>
                         <th>By/Agency</th>
-                    </tr>
+                        <th>Details</th> </tr>
                 </thead>
                 <tbody>
-                    <!-- Submission status row -->
                     <tr>
                         <td>1</td>
                         <td>
@@ -287,8 +286,9 @@
                         </td>
                         <td>{{ \Carbon\Carbon::parse($inquiry->submissionDate)->format('d M Y H:i') }}</td>
                         <td>MCMC</td>
-                    </tr>
+                        <td>-</td> </tr>
                     @php $row = 2; @endphp
+
                     @foreach($inquiry->assignments as $assignment)
                         <tr>
                             <td>{{ $row++ }}</td>
@@ -304,8 +304,10 @@
                             </td>
                             <td>{{ \Carbon\Carbon::parse($assignment->assignmentDate)->format('d M Y H:i') }}</td>
                             <td>{{ $assignment->agency->user->username ?? 'Agency' }}</td>
+                            <td>{{ !empty($assignment->comment) ? $assignment->comment : '-' }}</td>
                         </tr>
                     @endforeach
+
                     @foreach($inquiry->assignments as $assignment)
                         @if($assignment->progress)
                         <tr>
@@ -323,6 +325,7 @@
                             </td>
                             <td>{{ \Carbon\Carbon::parse($assignment->progress->verificationDate)->format('d M Y H:i') }}</td>
                             <td>{{ $assignment->agency->user->username ?? 'Agency' }}</td>
+                            <td>{{ !empty($assignment->progress->investigationDetails) ? $assignment->progress->investigationDetails : '-' }}</td>
                         </tr>
                         @endif
                     @endforeach

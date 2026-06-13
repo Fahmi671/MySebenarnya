@@ -23,7 +23,7 @@ class ProgressController extends Controller
             });
         }
     
-        // Filter by status (applies to all status fields, see Blade for logic)
+        // Filter by status 
         if ($request->filled('status')) {
             $query->where(function ($q) use ($request) {
                 $q->whereHas('progress', function ($q2) use ($request) {
@@ -44,105 +44,144 @@ class ProgressController extends Controller
         return view('InquiryProgress.publicInquiryTracking', compact('inquiries'));
     }
 
-    // Add this method for the details page
     public function mcmcMonitorAgencyProgress($submissionID)
     {
         // Eager load all assignments and progress for the inquiry submission
         $inquiry = InquirySubmission::with([
-            'assignments.agency.user', // include agency.user for username
+            'assignments.agency.user', 
             'assignments.progress',
             'publicUser',
         ])->findOrFail($submissionID);
+
+        // PERFECTIVE MAINTENANCE: Prepare data for the new "Details" column
+        // We do NOT touch the status variables here, so your green badges will work again!
+        foreach ($inquiry->assignments as $assignment) {
+            $detailsArray = [];
+            
+            // Grab the Agency comment if it exists
+            if (!empty($assignment->comment)) {
+                $detailsArray[] = "Agency Comment: " . $assignment->comment;
+            }
+
+            // Grab the Investigation details if they exist
+            if ($assignment->progress && !empty($assignment->progress->investigationDetails)) {
+                $detailsArray[] = "Investigation Details: " . $assignment->progress->investigationDetails;
+            }
+
+            // This creates the clean data for the new column
+            $assignment->display_details = !empty($detailsArray) ? implode(' | ', $detailsArray) : '-';
+        }
 
         return view('InquiryProgress.mcmcMonitorAgencyProgress', compact('inquiry'));
     }
     
     public function agencyAssignedInquiry(Request $request)
-{
-    $agencyId = auth()->user()->agency->agencyID ?? null;
+    {
+        $agencyId = auth()->user()->agency->agencyID ?? null;
 
-    $inquiries = \App\Models\InquirySubmission::whereHas('assignments', function ($q) use ($agencyId) {
-            $q->where('agencyID', $agencyId)
-              ->where('jurisdictionStatus', 'Accepted')
-              ->whereDoesntHave('progress'); // <-- Exclude those with progress
-        })
-        ->with(['assignments' => function ($q) use ($agencyId) {
-            $q->where('agencyID', $agencyId)
-              ->where('jurisdictionStatus', 'Accepted')
-              ->whereDoesntHave('progress'); // <-- Exclude those with progress
-        }])
-        ->orderBy('submissionDate', 'desc')
-        ->paginate(10);
+        $inquiries = \App\Models\InquirySubmission::whereHas('assignments', function ($q) use ($agencyId) {
+                $q->where('agencyID', $agencyId)
+                  ->where('jurisdictionStatus', 'Accepted')
+                  ->whereDoesntHave('progress'); 
+            })
+            ->with(['assignments' => function ($q) use ($agencyId) {
+                $q->where('agencyID', $agencyId)
+                  ->where('jurisdictionStatus', 'Accepted')
+                  ->whereDoesntHave('progress'); 
+            }])
+            ->orderBy('submissionDate', 'desc')
+            ->paginate(10);
 
-    return view('InquiryProgress.agencyAssignedInquiry', compact('inquiries'));
-}
-public function agencyAssignedInquiryDetails($assignmentID)
-{
-    // Load assignment with related data
-    $assignment = SubmissionAssignment::with([
-        'inquirySubmission', // your relationship might be 'inquiry' or 'inquirySubmission'
-        'progress'
-    ])->findOrFail($assignmentID);
-
-    return view('InquiryProgress.agencyAssignedInquiryDetails', compact('assignment'));
-}
-
-public function updateInvestigationStatus(Request $request, $assignmentID)
-{
-    $request->validate([
-        'verificationStatus' => 'required|in:Verified as True,Identified as Fake',
-        'investigationDetails' => 'nullable|string',
-        'SupportingDocuments' => 'nullable|file|max:10240', // 10MB max, adjust as needed
-    ]);
-
-    $assignment = SubmissionAssignment::findOrFail($assignmentID);
-
-    // Find or create InquiryProgress for this assignment
-    $progress = InquiryProgress::where('assignmentID', $assignmentID)->first();
-    if (!$progress) {
-        $progress = new InquiryProgress();
-        $progress->assignmentID = $assignmentID;
-        $progress->submissionID = $assignment->submissionID;
-        $progress->agencyID = $assignment->agencyID;
+        return view('InquiryProgress.agencyAssignedInquiry', compact('inquiries'));
     }
 
-    $progress->verificationStatus = $request->verificationStatus;
-    $progress->verificationDate = now();
-    $progress->investigationDetails = $request->investigationDetails;
+    public function agencyAssignedInquiryDetails($assignmentID)
+    {
+        // Load assignment with related data
+        $assignment = SubmissionAssignment::with([
+            'inquirySubmission', 
+            'progress'
+        ])->findOrFail($assignmentID);
 
-    // Handle file upload (optional)
-    if ($request->hasFile('SupportingDocuments')) {
-        $file = $request->file('SupportingDocuments');
-        $filename = uniqid('support_') . '.' . $file->getClientOriginalExtension();
-        $path = $file->storeAs('supporting_documents', $filename, 'public');
-        $progress->SupportingDocuments = $path; // Save the path, not file content
+        return view('InquiryProgress.agencyAssignedInquiryDetails', compact('assignment'));
     }
 
-    $progress->save();
+    public function updateInvestigationStatus(Request $request, $assignmentID)
+    {
+        $request->validate([
+            'verificationStatus' => 'required|in:Verified as True,Identified as Fake',
+            'investigationDetails' => 'nullable|string',
+            'SupportingDocuments' => 'nullable|file|max:10240', // 10MB max, adjust as needed
+        ]);
 
-    return redirect()
-    ->route('InquiryProgress.agencyAssignedInquiry')
-    ->with('success', 'Status updated successfully.');
-}
-public function publicHistory(Request $request)
-{
-    $query = \App\Models\InquirySubmission::where('publicUserID', auth()->id());
+        $assignment = SubmissionAssignment::findOrFail($assignmentID);
 
-    $inquiries = $query
-        ->with(['progress', 'latestAssignment'])
-        ->orderBy('submissionDate', 'desc')
-        ->paginate(10);
+        // Find or create InquiryProgress for this assignment
+        $progress = InquiryProgress::where('assignmentID', $assignmentID)->first();
+        if (!$progress) {
+            $progress = new InquiryProgress();
+            $progress->assignmentID = $assignmentID;
+            $progress->submissionID = $assignment->submissionID;
+            $progress->agencyID = $assignment->agencyID;
+        }
 
-    return view('InquiryProgress.publicHistory', compact('inquiries'));
-}
+        $progress->verificationStatus = $request->verificationStatus;
+        $progress->verificationDate = now();
+        $progress->investigationDetails = $request->investigationDetails;
 
-public function publicHistoryDetails($submissionID)
-{
-    $inquiry = \App\Models\InquirySubmission::with([
-        'assignments.agency.user',
-        'assignments.progress'
-    ])->findOrFail($submissionID);
+        // Handle file upload (optional)
+        if ($request->hasFile('SupportingDocuments')) {
+            $file = $request->file('SupportingDocuments');
+            $filename = uniqid('support_') . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('supporting_documents', $filename, 'public');
+            $progress->SupportingDocuments = $path; // Save the path, not file content
+        }
 
-    return view('InquiryProgress.publicHistoryDetails', compact('inquiry'));
-}
+        $progress->save();
+
+        return redirect()
+        ->route('InquiryProgress.agencyAssignedInquiry')
+        ->with('success', 'Status updated successfully.');
+    }
+
+    public function publicHistory(Request $request)
+    {
+        $query = \App\Models\InquirySubmission::where('publicUserID', auth()->id());
+
+        $inquiries = $query
+            ->with(['progress', 'latestAssignment'])
+            ->orderBy('submissionDate', 'desc')
+            ->paginate(10);
+
+        return view('InquiryProgress.publicHistory', compact('inquiries'));
+    }
+
+    public function publicHistoryDetails($submissionID)
+    {
+        $inquiry = \App\Models\InquirySubmission::with([
+            'assignments.agency.user',
+            'assignments.progress'
+        ])->findOrFail($submissionID);
+
+        // PERFECTIVE MAINTENANCE: Prepare data for the new "Details" column
+        // We do NOT touch the status variables here, so your green badges will work again!
+        foreach ($inquiry->assignments as $assignment) {
+            $detailsArray = [];
+            
+            // Grab the Agency comment if it exists
+            if (!empty($assignment->comment)) {
+                $detailsArray[] = "Agency Comment: " . $assignment->comment;
+            }
+
+            // Grab the Investigation details if they exist
+            if ($assignment->progress && !empty($assignment->progress->investigationDetails)) {
+                $detailsArray[] = "Investigation Details: " . $assignment->progress->investigationDetails;
+            }
+
+            // This creates the clean data for the new column
+            $assignment->display_details = !empty($detailsArray) ? implode(' | ', $detailsArray) : '-';
+        }
+
+        return view('InquiryProgress.publicHistoryDetails', compact('inquiry'));
+    }
 }
